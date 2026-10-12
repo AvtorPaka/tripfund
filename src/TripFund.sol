@@ -3,8 +3,9 @@ pragma solidity ^0.8.37;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ITripFund} from "./interfaces/ITripFund.sol";
 
-contract TripFund {
+contract TripFund is ITripFund {
     IERC20 public immutable token;
     address public immutable organizer;
     uint256 public immutable goal;
@@ -14,23 +15,7 @@ contract TripFund {
     uint256 public totalRaised;
     bool public withdrawn;
 
-    event Contributed(address indexed contributor, uint256 amount);
-    event Refunded(address indexed contributor, uint256 amount);
-    event Withdrawn(address indexed organizer, uint256 amount);
-
-    error FundEnded();
-    error FundActive();
-    error NotOrganizer();
-    error GoalNotReached();
-    error GoalReached();
-    error AlreadyWithdrawn();
-    error DeadlineNotInFuture();
-    error ZeroRefund();
-    error ZeroAddress();
-    error ZeroGoal();
-    error ZeroAmount();
-
-    modifier afterDedline() {
+    modifier afterDeadline() {
         if (!_deadlinePassed()) revert FundActive();
         _;
     }
@@ -58,7 +43,7 @@ contract TripFund {
         SafeERC20.safeTransferFrom(token, msg.sender, address(this), amount);
     }
 
-    function withdraw() external afterDedline {
+    function withdraw() external afterDeadline {
         if (msg.sender != organizer) revert NotOrganizer();
         if (!_goalReached()) revert GoalNotReached();
         if (withdrawn) revert AlreadyWithdrawn();
@@ -70,7 +55,7 @@ contract TripFund {
         SafeERC20.safeTransfer(token, organizer, amount);
     }
 
-    function refund() external afterDedline {
+    function refund() external afterDeadline {
         if (_goalReached()) revert GoalReached();
 
         uint256 amount = contributions[msg.sender];

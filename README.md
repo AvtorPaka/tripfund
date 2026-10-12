@@ -8,10 +8,12 @@
 - [Установка](#установка)
 - [Сборка и тесты](#сборка-и-тесты)
 - [Пример: approve + взнос](#пример-approve--взнос)
+- [Контракты](#контракты)
 - [Тесты-кейсы](#тесты-кейсы)
     - [Взносы](#взносы-tripfundcontributetest)
     - [Выплаты](#выплаты-tripfundpayouttest)
     - [Прямые переводы](#прямые-переводы-tripfunddirecttransfertest)
+    - [Обновление V1 -> V2](#обновление-v1---v2-tripfundupgradetest)
 
 ## Версии
 
@@ -21,12 +23,16 @@
 | --- | --- |
 | Foundry (forge) | 1.8.5 |
 | Solidity | 0.8.37 |
-| OpenZeppelin Contracts | 5.7.0 (`lib/openzeppelin-contracts`) |
-| forge-std | 1.17.0 (`lib/forge-std`) |
+| OpenZeppelin Contracts <br> (lib/openzeppelin-contracts)| 5.7.0  |
+| forge-std <br> (lib/forge-std) | 1.17.0 |
+| OpenZeppelin Foundry Upgrades <br> (lib/openzeppelin-foundry-upgrades)| 0.4.2  |
+| Node.js | любая LTS, использовал 24.21 |
 
 ## Установка
 
 [Установка Foundry](https://www.getfoundry.sh/introduction/installation)
+
+[Установка Node.js](https://nodejs.org/en/download)
 
 ```sh
 git clone --recursive https://github.com/AvtorPaka/tripfund.git tripfund
@@ -57,7 +63,22 @@ token.approve(address(fund), 10e18);
 fund.contribute(10e18);
 ```
 
-После дедлайна при достигнутой цели организатор вызывает `fund.withdraw()`, иначе каждый участник вызывает `fund.refund()`.
+После дедлайна при достигнутой цели организатор вызывает fund.withdraw(), иначе каждый участник вызывает fund.refund().
+
+Для версии с Transparent Proxy (`TripFundV1`/`TripFundV2`) fund — это адрес прокси.
+
+## Контракты
+
+| Контракт | Назначение |
+| --- | --- |
+| `ITripFund` | Общий интерфейс: события, ошибки, геттеры, contribute, withdraw, refund |
+| `ITripFundV2` | `ITripFund` + contributeFor и событие ContributedFor |
+| `TripFund` | Реализует `ITripFund`. Основная версия. Параметры задаются в конструкторе и хранятся как immutable |
+| `TripFundV1` | Реализует `ITripFund`. Логика идентичная `TripFund` за `TransparentUpgradeableProxy`. Параметры в storage, задаются через initialize при создании прокси. Конструктор реализации вызывает _disableInitializers() |
+| `TripFundV2` | Наследует `TripFundV1` и реализует `ITripFundV2` без изменения хранилища + contributeFor |
+| `TripFundToken` | ERC-20 без комиссий и rebasing для локальных тестов |
+
+Обновление выполняет только владелец `ProxyAdmin`, которого `TransparentUpgradeableProxy` создаёт при деплое.
 
 ## Тесты-кейсы
 
@@ -76,20 +97,26 @@ fund.contribute(10e18);
 
 | Тест | Пункт | Кейс |
 | --- | --- | --- |
-| `test_RevertWhen_PayoutBeforeDeadlineEvenIfGoalReached` | 7 | до дедлайна `withdraw` и `refund` запрещены даже при достигнутой цели |
-| `test_Withdraw_WhenGoalReachedExactly` | 8 | сумма ровно `goal` — организатор получает её, баланс контракта 0 |
-| `test_Withdraw_WhenGoalExceeded` | 8 | сумма выше `goal` — организатор получает всю сумму |
+| `test_RevertWhen_PayoutBeforeDeadlineEvenIfGoalReached` | 7 | до дедлайна withdraw и refund запрещены даже при достигнутой цели |
+| `test_Withdraw_WhenGoalReachedExactly` | 8 | сумма ровно goal — организатор получает её, баланс контракта 0 |
+| `test_Withdraw_WhenGoalExceeded` | 8 | сумма выше goal — организатор получает всю сумму |
 | `test_RevertWhen_WithdrawByNonOrganizer` | 8 | запрет чужого вывода |
 | `test_RevertWhen_WithdrawTwice` | 8 | запрет повторного вывода |
 | `test_RevertWhen_WithdrawWhenGoalNotReached` | 8 | запрет вывода при недостигнутой цели (неверный исход) |
 | `test_RevertWhen_RefundWhenGoalReached` | 8 | запрет возврата при достигнутой цели (неверный исход) |
-| `test_Refund_IndependentRefundsWhenGoalNotReached` | 8 | сумма ниже `goal` — каждый вкладчик независимо возвращает свой полный вклад |
+| `test_Refund_IndependentRefundsWhenGoalNotReached` | 8 | сумма ниже goal — каждый вкладчик независимо возвращает свой полный вклад |
 | `test_RevertWhen_RefundTwice` | 8 | запрет повторного возврата |
 
 ### Прямые переводы: `TripFundDirectTransferTest`
 
 | Тест | Пункт | Кейс |
 | --- | --- | --- |
-| `test_DirectTransfer_DoesNotChangeTotalRaised` | 9 | прямой перевод токенов не меняет `totalRaised` |
+| `test_DirectTransfer_DoesNotChangeTotalRaised` | 9 | прямой перевод токенов не меняет totalRaised |
 | `test_DirectTransfer_RemainsAfterWithdraw` | 9 | после вывода организатором прямой перевод остаётся в контракте |
 | `test_DirectTransfer_RemainsAfterAllRefunds` | 9 | после всех возвратов прямой перевод остаётся в контракте |
+
+### Обновление V1 -> V2: `TripFundUpgradeTest`
+
+| Тест | Пункт | Кейс |
+| --- | --- | --- |
+| `test_UpgradeToV2_KeepsStateAndAddsContributeFor` | 12 | взнос в V1 через прокси, запрет обновления не владельцем `ProxyAdmin`, обновление до V2 через `Upgrades.upgradeProxy` с проверкой совместимости хранилища, после обновления сохранены адрес, параметры, вклады, totalRaised и токенный баланс, запрет повторной инициализации, contributeFor за друга, обычный взнос после обновления, при недостигнутой цели друг возвращает вклад |

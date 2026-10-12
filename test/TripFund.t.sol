@@ -4,6 +4,7 @@ pragma solidity ^0.8.37;
 import {Test} from "forge-std/Test.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {TripFund} from "../src/TripFund.sol";
+import {ITripFund} from "../src/interfaces/ITripFund.sol";
 import {TripFundToken} from "../src/TripFundToken.sol";
 
 abstract contract TripFundTestBase is Test {
@@ -102,7 +103,7 @@ contract TripFundContributeTest is TripFundTestBase {
         _approveAndContribute(alice, 100e18);
         Ledger memory before = _ledger(alice);
 
-        vm.expectRevert(TripFund.ZeroAmount.selector);
+        vm.expectRevert(ITripFund.ZeroAmount.selector);
         _contribute(alice, 0);
 
         _assertLedgerUnchanged(alice, before);
@@ -147,7 +148,7 @@ contract TripFundContributeTest is TripFundTestBase {
         _approve(alice, 100e18);
         Ledger memory before = _ledger(alice);
 
-        vm.expectRevert(TripFund.FundEnded.selector);
+        vm.expectRevert(ITripFund.FundEnded.selector);
         _contribute(alice, 100e18);
 
         _assertLedgerUnchanged(alice, before);
@@ -160,10 +161,10 @@ contract TripFundPayoutTest is TripFundTestBase {
         uint256 aliceContribution = fund.contributions(alice);
         vm.warp(deadline - 1);
 
-        vm.expectRevert(TripFund.FundActive.selector);
+        vm.expectRevert(ITripFund.FundActive.selector);
         _withdraw(organizer);
 
-        vm.expectRevert(TripFund.FundActive.selector);
+        vm.expectRevert(ITripFund.FundActive.selector);
         _refund(alice);
 
         assertFalse(fund.withdrawn());
@@ -199,7 +200,7 @@ contract TripFundPayoutTest is TripFundTestBase {
         _reachGoalExactly();
         vm.warp(deadline);
 
-        vm.expectRevert(TripFund.NotOrganizer.selector);
+        vm.expectRevert(ITripFund.NotOrganizer.selector);
         _withdraw(stranger);
 
         assertFalse(fund.withdrawn());
@@ -212,7 +213,7 @@ contract TripFundPayoutTest is TripFundTestBase {
         vm.warp(deadline);
         _withdraw(organizer);
 
-        vm.expectRevert(TripFund.AlreadyWithdrawn.selector);
+        vm.expectRevert(ITripFund.AlreadyWithdrawn.selector);
         _withdraw(organizer);
 
         assertEq(token.balanceOf(organizer), GOAL);
@@ -222,7 +223,7 @@ contract TripFundPayoutTest is TripFundTestBase {
         _approveAndContribute(alice, GOAL - 1);
         vm.warp(deadline);
 
-        vm.expectRevert(TripFund.GoalNotReached.selector);
+        vm.expectRevert(ITripFund.GoalNotReached.selector);
         _withdraw(organizer);
 
         assertFalse(fund.withdrawn());
@@ -235,7 +236,7 @@ contract TripFundPayoutTest is TripFundTestBase {
         vm.warp(deadline);
         Ledger memory before = _ledger(alice);
 
-        vm.expectRevert(TripFund.GoalReached.selector);
+        vm.expectRevert(ITripFund.GoalReached.selector);
         _refund(alice);
 
         _assertLedgerUnchanged(alice, before);
@@ -268,7 +269,7 @@ contract TripFundPayoutTest is TripFundTestBase {
         vm.warp(deadline);
         _refund(alice);
 
-        vm.expectRevert(TripFund.ZeroRefund.selector);
+        vm.expectRevert(ITripFund.ZeroRefund.selector);
         _refund(alice);
 
         assertEq(token.balanceOf(alice), INITIAL_BALANCE);
