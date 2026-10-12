@@ -19,5 +19,6 @@ docs/
 .env.*
 !.env.example
 
+*.DS_Store
 /.vscode/*
 !/.vscode/settings.json.template
